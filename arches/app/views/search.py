@@ -52,7 +52,7 @@ except ImportError:
 
 class SearchView(BaseManagerView):
 
-    def get(self, request):
+    def get(self, request, options=['map','advanced','results','saved', 'related', 'time']):
         saved_searches = JSONSerializer().serialize(settings.SAVED_SEARCHES)
         map_layers = models.MapLayer.objects.all()
         map_sources = models.MapSource.objects.all()
@@ -95,6 +95,7 @@ class SearchView(BaseManagerView):
         context['nav']['search'] = False
         context['nav']['help'] = (_('Searching the Arches Database'),'help/base-help.htm')
         context['help'] = 'search-help'
+        context['options'] = options
 
         return render(request, 'views/search.htm', context)
 
@@ -175,7 +176,6 @@ def search_results(request):
     dsl.include('displayname')
     dsl.include('displaydescription')
     dsl.include('map_popup')
-    dsl.include('marker')
 
     results = dsl.search(index='resource', doc_type=get_doc_type(request))
 
