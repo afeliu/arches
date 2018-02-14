@@ -281,6 +281,38 @@ class EDTFDataType(BaseDataType):
 
 class GeojsonFeatureCollectionDataType(BaseDataType):
 
+    def validateTile(self, value, source=None):
+        errors = []
+        coord_limit = 1500
+        coordinate_count = 0
+        spatial_filter = None
+        if(hasattr(settings, "DATA_SPATIAL_FILTER")):
+            spatial_filter = GEOSGeometry(JSONSerializer().serialize(settings.DATA_SPATIAL_FILTER))
+
+        def validate_geom(geom, coordinate_count=0):
+            try:
+                coordinate_count += geom.num_coords
+                if coordinate_count > coord_limit:
+                    message = 'Geometry has too many coordinates for Elasticsearch ({0}), Please limit to less then {1} coordinates of 5 digits of precision or less.'.format(coordinate_count, coord_limit)
+                    errors.append({'type': 'ERROR', 'message': 'datatype: {0} value: {1} {2} - {3}.'.format(self.datatype_model.datatype, value, source, message)})
+
+                if spatial_filter!=None and spatial_filter.contains(geom) == False:
+                    message = 'geometry out of limits'
+                    errors.append({'type': 'ERROR', 'message': message})
+            except:
+                message = 'Not a properly formatted geometry'
+                errors.append({'type': 'ERROR', 'message': 'datatype: {0} value: {1} {2} - {3}.'.format(self.datatype_model.datatype, value, source, message)})
+
+        for feature in value['features']:
+            try:
+                geom = GEOSGeometry(JSONSerializer().serialize(feature['geometry']))
+                validate_geom(geom, coordinate_count)
+            except:
+                message = 'It was not possible to serialize some feaures in your geometry.'
+                errors.append({'type': 'ERROR', 'message': 'datatype: {0} value: {1} {2} - {3}.'.format(self.datatype_model.datatype, value, source, message)})
+
+        return errors
+
     def validate(self, value, source=None):
         errors = []
         coord_limit = 1500
@@ -392,27 +424,42 @@ class GeojsonFeatureCollectionDataType(BaseDataType):
         if node is not None and node.config is not None:
             config = node.config
 
-            cluster_sql = """
+            #Afegim filtre espaial
+            if hasattr(settings, 'DATA_SPATIAL_FILTER') and settings.DATA_SPATIAL_FILTER != '':
+                cluster_sql = (
+                    " WITH clusters(tileid, resourceinstanceid, nodeid, geom, cid) AS ("
+                    " SELECT m.*, ST_ClusterDBSCAN(geom, eps := %s, minpoints := %s) over () AS cid"
+                    " FROM mv_geojson_geoms m,"
+                    " (SELECT ST_TRANSFORM(ST_GeomFromGeoJSON('" + JSONSerializer().serialize(settings.DATA_SPATIAL_FILTER) + "'),900913) as geom_filter) g"
+                    " WHERE nodeid = '%s'"
+                    " and st_intersects(g.geom_filter, m.geom)"
+                    ")")
+                
+            else :
+                cluster_sql = """
                 WITH clusters(tileid, resourceinstanceid, nodeid, geom, cid) AS (
                     SELECT m.*, ST_ClusterDBSCAN(geom, eps := %s, minpoints := %s) over () AS cid
-                	FROM mv_geojson_geoms m
+                    FROM mv_geojson_geoms m
                     WHERE nodeid = '%s'
-                )
+                )"""
+
+
+            cluster_sql += """
 
                 SELECT resourceinstanceid::text,
-                		row_number() over () as __id__,
-                		1 as total,
-                		ST_Centroid(geom) AS __geometry__,
+                        row_number() over () as __id__,
+                        1 as total,
+                        ST_Centroid(geom) AS __geometry__,
                         '' AS extent
-                	FROM clusters
-                	WHERE cid is NULL
+                    FROM clusters
+                    WHERE cid is NULL
 
                 UNION
 
                 SELECT NULL as resourceinstanceid,
-                		row_number() over () as __id__,
-                		count(*) as total,
-                		ST_Centroid(
+                        row_number() over () as __id__,
+                        count(*) as total,
+                        ST_Centroid(
                             ST_Collect(geom)
                         ) AS __geometry__,
                         ST_AsGeoJSON(
@@ -422,9 +469,9 @@ class GeojsonFeatureCollectionDataType(BaseDataType):
                                 ), 4326
                             )
                         ) AS extent
-                	FROM clusters
-                	WHERE cid IS NOT NULL
-                	GROUP BY cid
+                    FROM clusters
+                    WHERE cid IS NOT NULL
+                    GROUP BY cid
             """
 
             for i in range(int(config['clusterMaxZoom']) + 1):
@@ -433,15 +480,29 @@ class GeojsonFeatureCollectionDataType(BaseDataType):
                 sql_string = cluster_sql % (distance, int(config['clusterMinPoints']), node.pk)
                 sql_list.append(sql_string)
 
-            sql_list.append("""
-                SELECT resourceinstanceid::text,
-                        (row_number() over ())::text as __id__,
-                        1 as total,
-                        geom AS __geometry__,
-                        '' AS extent
-                    FROM mv_geojson_geoms
-                    WHERE nodeid = '%s'
-            """ % node.pk)
+            if hasattr(settings, 'DATA_SPATIAL_FILTER') and settings.DATA_SPATIAL_FILTER != '':
+                sql_string = (" SELECT resourceinstanceid::text,"
+                            " (row_number() over ())::text as __id__,"
+                            " 1 as total,"
+                            " geom AS __geometry__,"
+                            " '' AS extent"
+                        " FROM mv_geojson_geoms m,"
+                        " (SELECT ST_TRANSFORM(ST_GeomFromGeoJSON('" + JSONSerializer().serialize(settings.DATA_SPATIAL_FILTER) + "'),900913) as geom_filter) g"
+                        " WHERE nodeid = '%s'"
+                        " and st_intersects(g.geom_filter, m.geom)"
+                ) % node.pk
+                sql_list.append(sql_string)
+
+            else:
+                sql_list.append("""
+                    SELECT resourceinstanceid::text,
+                            (row_number() over ())::text as __id__,
+                            1 as total,
+                            geom AS __geometry__,
+                            '' AS extent
+                        FROM mv_geojson_geoms m
+                        WHERE nodeid = '%s'
+                """ % node.pk)
 
         else:
             config = {"cacheTiles": False}
