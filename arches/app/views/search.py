@@ -53,7 +53,7 @@ except ImportError:
 
 class SearchView(BaseManagerView):
 
-    def get(self, request):
+    def get(self, request, options=['map','advanced','results','saved', 'related', 'time']):
         saved_searches = JSONSerializer().serialize(settings.SAVED_SEARCHES)
         map_layers = models.MapLayer.objects.all()
         map_sources = models.MapSource.objects.all()
@@ -90,14 +90,15 @@ class SearchView(BaseManagerView):
             datatypes=datatypes,
             datatypes_json=JSONSerializer().serialize(datatypes),
         )
-
+        
         context['nav']['title'] = _('Search')
         context['nav']['icon'] = 'fa-search'
         context['nav']['search'] = False
         context['nav']['help'] = (_('Searching the Arches Database'),'help/base-help.htm')
         context['help'] = 'search-help'
         context['map'] = resolve(request.path_info).url_name == 'map_home'
-    
+        context['options'] = options
+
         return render(request, 'views/search.htm', context)
 
 def home_page(request):
@@ -166,7 +167,7 @@ def search_results(request):
         search_results_dsl = build_search_results_dsl(request)
     except Exception as err:
         return JSONResponse(err.message, status=500)
-        
+
     dsl = search_results_dsl['query']
     search_buffer = search_results_dsl['search_buffer']
     dsl.include('graph_id')
@@ -239,11 +240,11 @@ def get_doc_type(request):
 
 def build_search_results_dsl(request):
     term_filter = request.GET.get('termFilter', '')
-    
+
     spatial_filter_organization = None
     if hasattr(settings, 'DATA_SPATIAL_FILTER') and settings.DATA_SPATIAL_FILTER != '':
          spatial_filter_organization = settings.DATA_SPATIAL_FILTER
-    
+
     spatial_filter = JSONDeserializer().deserialize(request.GET.get('mapFilter', '{}'))
     export = request.GET.get('export', None)
     page = 1 if request.GET.get('page') == '' else int(request.GET.get('page', 1))
@@ -519,7 +520,7 @@ def time_wheel_config(request):
                 min_century = century
                 max_century = century + 100
                 century_name="Century (%s - %s)"%(min_century, max_century)
-                cent_boolquery = gen_range_agg(gte=ExtendedDateFormat(min_century).lower, 
+                cent_boolquery = gen_range_agg(gte=ExtendedDateFormat(min_century).lower,
                     lte=ExtendedDateFormat(max_century).lower)
                 century_agg = FiltersAgg(name=century_name)
                 century_agg.add_filter(cent_boolquery)
@@ -530,7 +531,7 @@ def time_wheel_config(request):
                     min_decade = decade
                     max_decade = decade + 10
                     decade_name = "Decade (%s - %s)"%(min_decade, max_decade)
-                    dec_boolquery = gen_range_agg(gte=ExtendedDateFormat(min_decade).lower, 
+                    dec_boolquery = gen_range_agg(gte=ExtendedDateFormat(min_decade).lower,
                         lte=ExtendedDateFormat(max_decade).lower)
                     decade_agg = FiltersAgg(name=decade_name)
                     decade_agg.add_filter(dec_boolquery)

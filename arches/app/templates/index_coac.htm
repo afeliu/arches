@@ -88,7 +88,7 @@ The data-spy and data-target are part of the built-in Bootstrap scrollspy functi
                             <a href="{% url 'search_home' %}">{% trans "Search" %}</a>
                         </li>
                         <li class="page-scroll">
-                            <a href="{% url 'map_home' %}?">{% trans "Map" %}</a>
+                            <a href="{% url 'map_search' %}">{% trans "Map" %}</a>
                         </li>
                         <li class="page-scroll">
                             <a href="#share">{% trans "Share" %}</a>
@@ -99,8 +99,8 @@ The data-spy and data-target are part of the built-in Bootstrap scrollspy functi
                             <ul class="lenguages">
                                     {% for lang in LANGUAGES %}
                                     <li class="active">
-                                        <form id="lang-form-{{ lang.0 }}" action="/coac/i18n/setlang/" method="post">
-                                        
+                                        <form id="lang-form-{{ lang.0 }}" action="/i18n/setlang/" method="post">
+
                                         <input name="next" type="hidden" value="/" />
                                         {% csrf_token %}
                                         <input name="language" type="hidden" value="{{ lang.0 }}" />
@@ -108,7 +108,7 @@ The data-spy and data-target are part of the built-in Bootstrap scrollspy functi
                                         </form>
                                     </li>
                                     {% endfor %}
-                                
+
                             </ul>
                         </li>
                         {% if user|can_create_resource_instance %}
@@ -138,7 +138,7 @@ The data-spy and data-target are part of the built-in Bootstrap scrollspy functi
                             <li><a href="{% url 'auth' %}?next={% url 'home' %}{% if user.username != 'anonymous' %}&logout=true{% endif %}">{% trans 'Logout' %}</a></li>
                             <li><a href="{% url 'user_profile_manager' %}">{% trans 'User Profile' %}</a></li>
                         </ul>
-                        
+
                         <!-- /ko -->
                     </ul>
                 </div>
@@ -245,7 +245,7 @@ The data-spy and data-target are part of the built-in Bootstrap scrollspy functi
     <!-- End Intro Section -->
 
 
-   
+
     <section id="share" class="news-section bg-grey" >
         <div class="container content-lg">
             <div class="title-v1">

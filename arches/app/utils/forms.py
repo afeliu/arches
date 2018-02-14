@@ -22,7 +22,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.utils.translation import ugettext as _
 from arches.app.models import models
-from captcha.fields import ReCaptchaField
+#from captcha.fields import ReCaptchaField
 
 class ArchesUserCreationForm(UserCreationForm):
     """
