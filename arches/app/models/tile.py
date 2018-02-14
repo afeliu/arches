@@ -184,20 +184,21 @@ class Tile(models.TileModel):
                         raise ValidationError(message, (', ').join(missing_nodes))
 
     def validateGeometryTile(self, request):
+        validation_geom_errors = []
         for nodeid, value in self.data.iteritems():
             datatype_factory = DataTypeFactory()
             node = models.Node.objects.get(nodeid=nodeid)
             datatype = datatype_factory.get_instance(node.datatype)
             datatype.clean(self, nodeid)
-            if request is not None:                
+            if request is not None:   
                 if(node.datatype=="geojson-feature-collection" and self.data[nodeid] != None):
-                    validation_geom_errors.extend(datatype.validateTile(self.data[nodeid]))
-                    
-            if validation_geom_errors != []:
-                message = _('Validation errors:')
-                for item in validation_geom_errors:
-                    message += "\n" + item["message"]
-                raise ValidationError(message)
+                    errors = datatype.validateTile(self.data[nodeid])
+                    validation_geom_errors.extend(errors)
+                    if validation_geom_errors != []:
+                        message = _('Validation errors:')
+                        for item in validation_geom_errors:
+                            message += "\n" + item["message"]
+                        raise ValidationError(message)
 
 
     def save(self, *args, **kwargs):
@@ -205,13 +206,11 @@ class Tile(models.TileModel):
         index = kwargs.pop('index', True)
         self.__preSave(request)
         missing_nodes = []
-        validation_geom_errors = []
         creating_new_tile = True
         user_is_reviewer = False
 
         self.check_for_missing_nodes(request)
         self.validateGeometryTile(request)
-
         try:
             user = request.user
             user_is_reviewer = request.user.groups.filter(name='Resource Reviewer').exists()
