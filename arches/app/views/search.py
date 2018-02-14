@@ -175,6 +175,7 @@ def search_results(request):
     dsl.include('displayname')
     dsl.include('displaydescription')
     dsl.include('map_popup')
+    dsl.include('marker')
 
     results = dsl.search(index='resource', doc_type=get_doc_type(request))
 
@@ -236,6 +237,11 @@ def get_doc_type(request):
 
 def build_search_results_dsl(request):
     term_filter = request.GET.get('termFilter', '')
+
+    spatial_filter_organization = None
+    if hasattr(settings, 'DATA_SPATIAL_FILTER') and settings.DATA_SPATIAL_FILTER != '':
+        spatial_filter_organization = settings.DATA_SPATIAL_FILTER
+
     spatial_filter = JSONDeserializer().deserialize(request.GET.get('mapFilter', '{}'))
     export = request.GET.get('export', None)
     page = 1 if request.GET.get('page') == '' else int(request.GET.get('page', 1))
@@ -314,6 +320,16 @@ def build_search_results_dsl(request):
             # get the nodegroup_ids that the user has permission to search
             spatial_query.filter(Terms(field='geometries.nodegroup_id', terms=permitted_nodegroups))
             search_query.filter(Nested(path='geometries', query=spatial_query))
+
+	#DATA SPATIAL FILTER
+    if spatial_filter_organization !=None and 'features' not in spatial_filter:
+        geoshape = GeoShape(field='geometries.geom.features.geometry', type=spatial_filter_organization['type'], coordinates=spatial_filter_organization['coordinates'] )
+        spatial_query = Bool()
+        spatial_query.filter(geoshape)
+
+        # get the nodegroup_ids that the user has permission to search
+        spatial_query.filter(Terms(field='geometries.nodegroup_id', terms=permitted_nodegroups))
+        search_query.filter(Nested(path='geometries', query=spatial_query))
 
     if 'fromDate' in temporal_filter and 'toDate' in temporal_filter:
         now = str(datetime.utcnow())
