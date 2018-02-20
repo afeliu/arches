@@ -84,17 +84,44 @@ define([
                 graph: this.viewModel.graph
             })
 
-            var resizeFilter = function(duration){
+            var resizeFilter = function (duration) {
                 var duration = duration;
-                return function(){
-                    var resize = function(){
+                return function () {
+                    var resize = function () {
                         $(window).trigger("resize");
                     }
                     setTimeout(resize, duration);
                 }
             }
 
-            this.viewModel.selectedTab = this.viewModel.resourceEditorContext === true ? ko.observable(this.viewModel.relatedResourcesManager) : ko.observable(this.filters.mapFilter);
+            var selected;
+            var selectedTab = this.filters.mapFilter;
+
+            if (optionsTabs[0] == 'results' && optionsTabs.length > 1) {
+                selected = optionsTabs[1];
+            }
+            else if (optionsTabs.length > 0) {
+                selected = optionsTabs[0];
+            }
+
+            switch(selected) {
+                case "map":
+                    selectedTab = this.filters.mapFilter;
+                    break;
+                case "advanced":
+                    selectedTab = this.filters.advancedFilter;
+                    break;
+                case "saved":
+                    selectedTab = this.filters.savedSearches;
+                    break;
+                case "related":
+                    selectedTab = this.filters.mapFilter;
+                    break;
+                case "time":
+                    selectedTab = this.filters.timeFilter;
+            }
+
+            this.viewModel.selectedTab = this.viewModel.resourceEditorContext === true ? ko.observable(this.viewModel.relatedResourcesManager) : ko.observable(selectedTab);
             this.viewModel.selectedTab.subscribe(resizeFilter(100));
             if (this.viewModel.resourceEditorContext === true) {
                 this.viewModel.openRelatedResources.subscribe(function(val) {

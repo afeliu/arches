@@ -1,5 +1,12 @@
 {% load i18n %}
 {% load template_tags %}
+{% load static %}
+
+{% block css %}
+    <link href="{% static 'css/simplified-search.css' %}" rel="stylesheet">
+{% endblock css%}
+
+
 <div class="content-panel" data-bind="click:function() { menuActive(false); }, visible: true", style="display:none;">
 
     <!-- Title Block -->
@@ -117,25 +124,9 @@
 </div>
 
 <script>
-        var slected;
-	{% if options.0 == 'results' and options|length > 1 %}
-        slected = "{{options.1}}";
-	{% elif options|length > 0 %}
-        slected = "{{options.0}}";
-	{% endif %}
-        if(slected === "map") {
-            selectedTab(mapFilter);
-        }
-        else if(slected === "advanced"){
-            selectedTab(advancedFilter);
-        }
-        else if(slected === "saved"){
-            selectedTab(savedSearches);
-        }
-        else if(slected === "related"){
-            selectedTab(mapFilter);
-        }
-        else if(slected === "time"){
-            selectedTab(timeFilter);
-        }
+
+    var optionsTabs = [];
+    {% for option in options %}
+    optionsTabs.push('{{ option }}');
+    {% endfor %}
 </script>
